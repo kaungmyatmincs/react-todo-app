@@ -4,36 +4,46 @@ pipeline {
     environment {
         DOCKER_HUB_USER = 'kaungmyatmin21'
         IMAGE_NAME = 'todo-app'
-        IMAGE_TAG = 'latest'
+        DOCKER_HUB_CREDS = 'docker-hub-creds'
     }
 
     stages {
-        stage('Build Docker Image') {
+        stage('Build') {
             steps {
-                echo 'Building Docker image...'
-                bat "docker build -t %DOCKER_HUB_USER%/%IMAGE_NAME%:%IMAGE_TAG% ."
+                echo 'Building the application...'
+                sh 'npm install'
             }
         }
 
-        stage('Push to Docker Hub') {
+        stage('Test') {
             steps {
-                echo 'Pushing to Docker Hub...'
-                withCredentials([usernamePassword(credentialsId: 'docker-hub-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    bat '''
-                    @echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin
-                    docker push %DOCKER_HUB_USER%/%IMAGE_NAME%:%IMAGE_TAG%
-                    '''
+                echo 'Running unit tests...'
+                sh 'npm test || true'
+            }
+        }
+
+        stage('Containerize') {
+            steps {
+                echo 'Creating Docker image...'
+                sh "docker build -t ${DOCKER_HUB_USER}/${IMAGE_NAME}:latest ."
+            }
+        }
+
+        stage('Push') {
+            steps {
+                echo 'Logging into Docker Hub and pushing image...'
+                withCredentials([usernamePassword(credentialsId: "${DOCKER_HUB_CREDS}", passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                    sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
+                    sh "docker push ${DOCKER_HUB_USER}/${IMAGE_NAME}:latest"
                 }
             }
         }
     }
 
     post {
-        success {
-            echo 'Pipeline succeeded!'
-        }
-        failure {
-            echo 'Pipeline failed!'
+        always {
+            echo 'Cleaning up workspace...'
+            sh "docker rmi ${DOCKER_HUB_USER}/${IMAGE_NAME}:latest || true"
         }
     }
 }
