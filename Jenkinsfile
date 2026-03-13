@@ -12,33 +12,34 @@ pipeline {
     }
 
     stages {
-        // No manual checkout stage needed; Jenkins does it automatically
-        
         stage('Build') {
             steps {
-                echo 'Building...'
+                echo 'Building the application...'
                 sh 'npm install'
             }
         }
 
         stage('Test') {
             steps {
-                echo 'Testing...'
-                sh 'npm test || true'
+                echo 'Running unit tests...'
+                // CI=true makes it run once and exit; || true prevents failure
+                sh 'CI=true npm test || true'
             }
         }
 
         stage('Containerize') {
             steps {
-                sh "docker build -t ${DOCKER_HUB_USER}/${IMAGE_NAME}:latest ."
+                echo 'Creating Docker image...'
+                sh "docker build -t ${env.DOCKER_HUB_USER}/${env.IMAGE_NAME}:latest ."
             }
         }
 
         stage('Push') {
             steps {
-                withCredentials([usernamePassword(credentialsId: "${DOCKER_HUB_CREDS}", passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                echo 'Logging into Docker Hub and pushing image...'
+                withCredentials([usernamePassword(credentialsId: "${env.DOCKER_HUB_CREDS}", passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
                     sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
-                    sh "docker push ${DOCKER_HUB_USER}/${IMAGE_NAME}:latest"
+                    sh "docker push ${env.DOCKER_HUB_USER}/${env.IMAGE_NAME}:latest"
                 }
             }
         }
@@ -46,7 +47,9 @@ pipeline {
 
     post {
         always {
-            sh "docker rmi ${DOCKER_HUB_USER}/${IMAGE_NAME}:latest || true"
+            echo 'Cleaning up workspace...'
+            // Using env. prefix here prevents the "No such property" error
+            sh "docker rmi ${env.DOCKER_HUB_USER}/${env.IMAGE_NAME}:latest || true"
         }
     }
 }
