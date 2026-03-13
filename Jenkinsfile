@@ -8,13 +8,6 @@ pipeline {
     }
 
     stages {
-        stage('Build') {
-            steps {
-                echo 'Installing dependencies...'
-                bat 'npm install'
-            }
-        }
-
         stage('Build Docker Image') {
             steps {
                 echo 'Building Docker image...'
@@ -31,9 +24,6 @@ pipeline {
     }
 
     post {
-        always {
-            echo 'Pipeline finished!'
-        }
         success {
             echo 'Pipeline succeeded!'
         }
